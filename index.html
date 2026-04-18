@@ -1,4 +1,4 @@
-<!DOCTYPE html> 
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
@@ -6,21 +6,21 @@
 <title>Scooter vs Wolves</title>
 <style>
   * { box-sizing: border-box; margin: 0; padding: 0; }
-  body { background: #1a1a2e; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; font-family: monospace; }
+  body { background: #1a1a2e; display: flex; flex-direction: column; align-items: center; justify-content: center; min-height: 100vh; font-family: monospace; user-select: none; }
   h1 { color: #FFE066; font-size: 22px; margin-bottom: 10px; letter-spacing: 2px; }
   #ui { font-size: 13px; color: #aaa; display: flex; justify-content: space-between; width: 480px; padding: 8px 2px; }
   #ui b { color: #fff; }
-  canvas { display: block; background: #87CEEB; border-radius: 10px; border: 1px solid #444; }
-  #msg { text-align: center; font-size: 13px; color: #aaa; margin-top: 8px; min-height: 20px; }
-  #credit { margin-top: 14px; font-size: 11px; color: #555; }
+  canvas { display: block; background: #87CEEB; border-radius: 10px; border: 2px solid #FFE066; cursor: pointer; outline: none; }
+  #msg { text-align: center; font-size: 14px; color: #FFE066; margin-top: 10px; min-height: 20px; font-weight: bold; }
+  #credit { margin-top: 10px; font-size: 11px; color: #555; }
 </style>
 </head>
 <body>
 <h1>⚾ SCOOTER VS WOLVES ⚾</h1>
 <div id="ui"><span>Score: <b id="score">0</b></span><span>Lives: <b id="lives">3</b></span><span>Wave: <b id="wave">1</b></span></div>
-<canvas id="gameCanvas" width="480" height="400"></canvas>
-<div id="msg">Press SPACE or tap to start!</div>
-<div id="credit">Arrow keys to move &bull; Space to throw &bull; Touch/drag on mobile</div>
+<canvas id="gameCanvas" width="480" height="400" tabindex="0"></canvas>
+<div id="msg">Click the game then press SPACE to start!</div>
+<div id="credit">Arrow keys / WASD to move &bull; SPACE to throw &bull; Drag to move on mobile</div>
 
 <script>
 const canvas = document.getElementById('gameCanvas');
@@ -30,14 +30,31 @@ const livesEl = document.getElementById('lives');
 const waveEl = document.getElementById('wave');
 const msgEl = document.getElementById('msg');
 
+canvas.addEventListener('click', () => canvas.focus());
+canvas.addEventListener('mousedown', () => canvas.focus());
+window.addEventListener('load', () => canvas.focus());
+canvas.focus();
+
 let state = 'idle', score = 0, lives = 3, wave = 1;
-let player, balls, enemies, enemyBalls, particles, keys, lastTime, enemyDir, enemyShootTimer, clouds;
+let player, balls, enemies, enemyBalls, particles, lastTime, enemyDir, enemyShootTimer, clouds;
 const groundY = 370;
+const keys = {};
+
+function handleKeyDown(e) {
+  keys[e.key] = true;
+  if ((e.key === ' ' || e.key === 'Enter') && (state === 'idle' || state === 'dead')) startGame();
+  if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
+}
+function handleKeyUp(e) { keys[e.key] = false; }
+window.addEventListener('keydown', handleKeyDown);
+window.addEventListener('keyup', handleKeyUp);
+canvas.addEventListener('keydown', handleKeyDown);
+canvas.addEventListener('keyup', handleKeyUp);
 
 function init() {
   player = { x: 240, y: 345, w: 40, h: 36, speed: 220, invincible: 0, legAnim: 0 };
   balls = []; enemies = []; enemyBalls = []; particles = [];
-  keys = {}; enemyDir = 1; enemyShootTimer = 0;
+  enemyDir = 1; enemyShootTimer = 0;
   clouds = [
     { x: 60, y: 40, w: 90, h: 38 }, { x: 200, y: 25, w: 70, h: 30 },
     { x: 360, y: 50, w: 100, h: 36 }, { x: 430, y: 20, w: 60, h: 26 }
@@ -68,43 +85,33 @@ function drawGround() {
 function drawScooterKid(x, y, inv, legAnim) {
   if (inv > 0 && Math.floor(inv * 10) % 2 === 0) return;
   const kickAngle = Math.sin(legAnim * 6) * 0.5;
-  // scooter deck
   ctx.fillStyle = '#cc2200';
   ctx.beginPath(); ctx.roundRect(x - 20, y + 10, 40, 7, 3); ctx.fill();
-  // handlebar stem
   ctx.strokeStyle = '#cc2200'; ctx.lineWidth = 3;
   ctx.beginPath(); ctx.moveTo(x + 10, y + 10); ctx.lineTo(x + 12, y - 4); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(x + 5, y - 4); ctx.lineTo(x + 20, y - 4); ctx.stroke();
-  // wheels
   ctx.fillStyle = '#222';
   ctx.beginPath(); ctx.arc(x - 14, y + 18, 7, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#888'; ctx.beginPath(); ctx.arc(x - 14, y + 18, 3, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#222';
   ctx.beginPath(); ctx.arc(x + 14, y + 18, 7, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#888'; ctx.beginPath(); ctx.arc(x + 14, y + 18, 3, 0, Math.PI * 2); ctx.fill();
-  // standing leg
   ctx.strokeStyle = '#3355cc'; ctx.lineWidth = 5; ctx.lineCap = 'round';
   ctx.beginPath(); ctx.moveTo(x - 2, y + 4); ctx.lineTo(x - 4, y + 10); ctx.stroke();
-  // kicking leg
   ctx.beginPath();
   ctx.moveTo(x - 2, y + 4);
   ctx.lineTo(x - 2 + Math.sin(kickAngle) * 14, y + 10 + Math.cos(kickAngle) * 8);
   ctx.stroke();
-  // sneaker
   ctx.fillStyle = '#fff';
   ctx.beginPath(); ctx.ellipse(x - 2 + Math.sin(kickAngle) * 14, y + 10 + Math.cos(kickAngle) * 8 + 4, 6, 4, kickAngle, 0, Math.PI * 2); ctx.fill();
-  // body
   ctx.fillStyle = '#ff6644';
   ctx.beginPath(); ctx.roundRect(x - 9, y - 10, 18, 16, 4); ctx.fill();
-  // helmet
   ctx.fillStyle = '#ffcc00';
   ctx.beginPath(); ctx.arc(x, y - 12, 10, Math.PI, 0); ctx.fill();
   ctx.fillStyle = '#ffaa00'; ctx.fillRect(x - 10, y - 13, 20, 4);
-  // blond hair
   ctx.fillStyle = '#f5d060';
   ctx.beginPath(); ctx.arc(x - 6, y - 10, 4, Math.PI, 1.8 * Math.PI); ctx.fill();
   ctx.beginPath(); ctx.arc(x + 6, y - 10, 4, Math.PI, 1.8 * Math.PI); ctx.fill();
-  // face
   ctx.fillStyle = '#fce0b0';
   ctx.beginPath(); ctx.arc(x, y - 10, 6, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#222';
@@ -112,10 +119,8 @@ function drawScooterKid(x, y, inv, legAnim) {
   ctx.beginPath(); ctx.arc(x + 3, y - 11, 1.2, 0, Math.PI * 2); ctx.fill();
   ctx.strokeStyle = '#333'; ctx.lineWidth = 1;
   ctx.beginPath(); ctx.arc(x + 0.5, y - 9, 2.5, 0.1, Math.PI - 0.1); ctx.stroke();
-  // arm on handlebar
   ctx.strokeStyle = '#fce0b0'; ctx.lineWidth = 4; ctx.lineCap = 'round';
   ctx.beginPath(); ctx.moveTo(x + 6, y - 4); ctx.lineTo(x + 14, y - 4); ctx.stroke();
-  // throwing arm
   ctx.beginPath(); ctx.moveTo(x - 8, y - 4); ctx.lineTo(x - 16, y - 12); ctx.stroke();
 }
 
@@ -123,24 +128,19 @@ function drawWolf(e) {
   if (!e.alive) return;
   const x = e.x, y = e.y;
   const colors = [['#888', '#aaa'], ['#6b4c2a', '#9b7a52'], ['#333', '#555']];
-  const [fur] = colors[e.type];
-  // body
+  const [fur, light] = colors[e.type];
   ctx.fillStyle = fur;
   ctx.beginPath(); ctx.ellipse(x, y + 4, 14, 12, 0, 0, Math.PI * 2); ctx.fill();
-  // head
   ctx.beginPath(); ctx.arc(x, y - 8, 13, 0, Math.PI * 2); ctx.fill();
-  // ears
   ctx.beginPath(); ctx.moveTo(x - 10, y - 18); ctx.lineTo(x - 16, y - 28); ctx.lineTo(x - 4, y - 20); ctx.closePath(); ctx.fill();
   ctx.beginPath(); ctx.moveTo(x + 10, y - 18); ctx.lineTo(x + 16, y - 28); ctx.lineTo(x + 4, y - 20); ctx.closePath(); ctx.fill();
   ctx.fillStyle = '#d88';
   ctx.beginPath(); ctx.moveTo(x - 10, y - 20); ctx.lineTo(x - 14, y - 26); ctx.lineTo(x - 5, y - 21); ctx.closePath(); ctx.fill();
   ctx.beginPath(); ctx.moveTo(x + 10, y - 20); ctx.lineTo(x + 14, y - 26); ctx.lineTo(x + 5, y - 21); ctx.closePath(); ctx.fill();
-  // snout
-  ctx.fillStyle = colors[e.type][1];
+  ctx.fillStyle = light;
   ctx.beginPath(); ctx.ellipse(x, y - 4, 8, 6, 0, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#222';
   ctx.beginPath(); ctx.ellipse(x, y - 7, 3, 2, 0, 0, Math.PI * 2); ctx.fill();
-  // mouth
   const mo = e.mouthOpen;
   ctx.strokeStyle = '#222'; ctx.lineWidth = 1.5;
   ctx.beginPath(); ctx.moveTo(x - 5, y - 2 + mo); ctx.quadraticCurveTo(x, y + 1 + mo * 1.5, x + 5, y - 2 + mo); ctx.stroke();
@@ -149,19 +149,17 @@ function drawWolf(e) {
     ctx.fillRect(x - 4, y - 2 + mo, 3, mo + 1);
     ctx.fillRect(x + 1, y - 2 + mo, 3, mo + 1);
   }
-  // eyes
   ctx.fillStyle = '#ff4400';
   ctx.beginPath(); ctx.arc(x - 5, y - 10, 2.5, 0, Math.PI * 2); ctx.fill();
   ctx.beginPath(); ctx.arc(x + 5, y - 10, 2.5, 0, Math.PI * 2); ctx.fill();
   ctx.fillStyle = '#000';
   ctx.beginPath(); ctx.arc(x - 5, y - 10, 1.2, 0, Math.PI * 2); ctx.fill();
   ctx.beginPath(); ctx.arc(x + 5, y - 10, 1.2, 0, Math.PI * 2); ctx.fill();
-  // angry eyebrows
   ctx.strokeStyle = '#222'; ctx.lineWidth = 2;
   ctx.beginPath(); ctx.moveTo(x - 8, y - 14); ctx.lineTo(x - 2, y - 12); ctx.stroke();
   ctx.beginPath(); ctx.moveTo(x + 8, y - 14); ctx.lineTo(x + 2, y - 12); ctx.stroke();
   if (e.type === 2) {
-    ctx.fillStyle = 'rgba(0,0,0,0.4)';
+    ctx.fillStyle = 'rgba(255,255,255,0.7)';
     ctx.font = 'bold 9px monospace'; ctx.textAlign = 'center';
     ctx.fillText('BOSS', x, y + 20);
   }
@@ -268,7 +266,6 @@ function update(dt) {
 
 function draw() {
   ctx.fillStyle = '#87CEEB'; ctx.fillRect(0, 0, 480, 400);
-  // sun
   ctx.fillStyle = '#FFE066';
   ctx.beginPath(); ctx.arc(430, 45, 28, 0, Math.PI * 2); ctx.fill();
   ctx.strokeStyle = '#FFD700'; ctx.lineWidth = 3;
@@ -291,6 +288,15 @@ function draw() {
     ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2); ctx.fill();
     ctx.globalAlpha = 1;
   });
+
+  if (state === 'idle') {
+    ctx.fillStyle = 'rgba(0,0,0,0.5)'; ctx.fillRect(0, 0, 480, 400);
+    ctx.fillStyle = '#FFE066'; ctx.font = 'bold 26px monospace'; ctx.textAlign = 'center';
+    ctx.fillText('SCOOTER VS WOLVES', 240, 160);
+    ctx.fillStyle = '#fff'; ctx.font = '15px monospace';
+    ctx.fillText('Click here, then press SPACE to start', 240, 210);
+    ctx.fillText('Arrow keys to move  |  SPACE to throw', 240, 240);
+  }
 }
 
 let shootCooldown = 0;
@@ -310,16 +316,9 @@ function loop(ts) {
   requestAnimationFrame(loop);
 }
 
-document.addEventListener('keydown', e => {
-  keys[e.key] = true;
-  if ((e.key === ' ' || e.key === 'Enter') && (state === 'idle' || state === 'dead')) startGame();
-  if ([' ', 'ArrowUp', 'ArrowDown', 'ArrowLeft', 'ArrowRight'].includes(e.key)) e.preventDefault();
-});
-document.addEventListener('keyup', e => { keys[e.key] = false; });
-
 let autoShoot = null;
 canvas.addEventListener('touchstart', e => {
-  e.preventDefault();
+  e.preventDefault(); canvas.focus();
   if (state === 'idle' || state === 'dead') { startGame(); return; }
   if (!autoShoot) autoShoot = setInterval(() => {
     if (state === 'play' && shootCooldown <= 0) { balls.push({ x: player.x, y: player.y - 20 }); shootCooldown = 0.25; }
@@ -332,6 +331,11 @@ canvas.addEventListener('touchmove', e => {
   player.x = Math.max(22, Math.min(458, (e.touches[0].clientX - rect.left) * (480 / rect.width)));
 }, { passive: false });
 canvas.addEventListener('touchend', e => { e.preventDefault(); clearInterval(autoShoot); autoShoot = null; }, { passive: false });
+
+canvas.addEventListener('click', () => {
+  canvas.focus();
+  if (state === 'idle' || state === 'dead') startGame();
+});
 
 function startGame() {
   score = 0; lives = 3; wave = 1;
